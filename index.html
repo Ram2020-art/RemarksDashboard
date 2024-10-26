@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Remarks Dashboard</title>
+    <style>
+        @import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css");
+
+        :root {
+            --primary-color: #121212;      
+            --secondary-color: #191919;    
+            --accent-color: #FF5722;       
+            --text-color: #E0E0E0;         
+            --input-bg-color: #333333;     
+            --input-border-color: #555555; 
+            --hover-accent-color: #E64A19; 
+            --hover-delete-color: #d40000; 
+            --shadow-color: rgba(0, 0, 0, 0.5);
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Arial', sans-serif;
+            background-color: var(--primary-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .remark-container {
+            background-color: var(--secondary-color);
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            box-shadow: 0 4px 6px var(--shadow-color);
+        }
+
+        .remark-title {
+            text-align: center;
+            margin-bottom: 20px;
+            font-size: 28px;
+            font-weight: bold;
+            color: var(--accent-color);
+        }
+
+        .remark-entry-form {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .remark-input-area {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            border-radius: 4px;
+            background-color: var(--input-bg-color);
+            color: var(--text-color);
+            margin-right: 10px;
+            resize: none;
+            height: 50px;
+        }
+
+        .btn-add, .btn-update {
+            padding: 10px 20px;
+            background-color: var(--accent-color);
+            border: none;
+            border-radius: 4px;
+            color: #FFF;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .btn-add:hover, .btn-update:hover {
+            background-color: var(--hover-accent-color);
+        }
+
+        .remark-items-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+            margin-top: 10px;
+        }
+
+        .remark-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            background-color: var(--input-bg-color);
+            position: relative;
+            cursor: grab;
+        }
+
+        .remark-content {
+            flex: 1;
+            color: var(--text-color);
+            cursor: pointer;
+            transition: color 0.3s ease;
+            position: relative;
+        }
+
+        .remark-content:hover {
+            color: var(--hover-accent-color);
+        }
+
+        .tooltip-copy {
+            display: none;
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: var(--accent-color);
+            color: #fff;
+            padding: 5px;
+            border-radius: 4px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 10;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .btn-delete,
+        .btn-edit {
+            border: none;
+            background: none;
+            color: var(--text-color);
+            cursor: pointer;
+            margin-left: 10px;
+            transition: color 0.3s ease;
+        }
+
+        .btn-delete:hover {
+            color: var(--hover-delete-color);
+        }
+
+        .btn-edit:hover {
+            color: var(--hover-accent-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="remark-container">
+        <h1 class="remark-title">Remarks Dashboard</h1>
+        <div class="remark-entry-form">
+            <textarea id='remarkInput' class="remark-input-area" placeholder="Drop all your remarks here for comprehensive insights." rows="1"></textarea>
+            <button title="Add" id="actionBtn" onclick="addRemark()" class="btn-add">Add</button>
+        </div>
+        <ul class="remark-items-list"></ul>
+    </div>
+
+    <script>
+        let remarkArray = [];
+        const remarkInput = document.getElementById('remarkInput');
+        const remarkList = document.querySelector('.remark-items-list');
+        const actionBtn = document.getElementById('actionBtn');
+        let editingIndex = null;
+
+        window.onload = function() {
+            if (localStorage.getItem('remarkArrayString')) {
+                remarkArray = JSON.parse(localStorage.getItem('remarkArrayString')) || [];
+                renderRemarks();
+            }
+        }
+
+        document.body.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                editingIndex !== null ? updateRemark() : addRemark();
+            }
+        });
+
+        function addRemark() {
+            const remarks = remarkInput.value.trim().split('\n');
+
+            remarks.forEach((remark) => {
+                if (remark && !remarkArray.includes(remark)) {
+                    remarkArray.unshift(remark);
+                }
+            });
+
+            if (remarks.length > 0) {
+                renderRemarks();
+                remarkInput.value = '';
+            }
+        }
+
+        function renderRemarks() {
+            let allRemarksString = '';
+            remarkArray.forEach(function(remark, i) {
+                allRemarksString += `
+                <li class="remark-item" draggable="true" ondragstart="drag(event, ${i})" ondragover="allowDrop(event)" ondrop="drop(event, ${i})">
+                    <span class="remark-content" 
+                        onclick="copyToClipboard(${i})" 
+                        onmouseover="showTooltip(${i})" 
+                        onmouseout="hideTooltip(${i})">${remark}</span>
+                    <button title="Edit" class="btn-edit" onclick="startEditing(${i})">
+                        <i class="fa-regular fa-edit"></i>
+                    </button>
+                    <button title="Remove" class="btn-delete" onclick="deleteRemark(${i})">
+                        <i class="fa-regular fa-trash-can"></i>
+                    </button>
+                    <div class="tooltip-copy" id="tooltip-${i}">Copy</div>
+                </li>`;
+            });
+            localStorage.setItem('remarkArrayString', JSON.stringify(remarkArray));
+            remarkList.innerHTML = allRemarksString;
+            resetEditing();
+        }
+
+        function deleteRemark(i) {
+            remarkArray.splice(i, 1);
+            localStorage.setItem('remarkArrayString', JSON.stringify(remarkArray));
+            renderRemarks();
+        }
+
+        function startEditing(i) {
+            remarkInput.value = remarkArray[i];
+            editingIndex = i;
+            actionBtn.textContent = 'Update';
+        }
+
+        function updateRemark() {
+            const newRemark = remarkInput.value.trim();
+            if (newRemark && !remarkArray.includes(newRemark)) {
+                remarkArray[editingIndex] = newRemark;
+                localStorage.setItem('remarkArrayString', JSON.stringify(remarkArray));
+                renderRemarks();
+            }
+        }
+
+        function drag(event, index) {
+            event.dataTransfer.setData("text/plain", index);
+        }
+
+        function allowDrop(event) {
+            event.preventDefault();
+        }
+
+        function drop(event, targetIndex) {
+            event.preventDefault();
+            const draggedIndex = event.dataTransfer.getData("text/plain");
+            if (draggedIndex !== targetIndex) {
+                const draggedRemark = remarkArray[draggedIndex];
+                remarkArray.splice(draggedIndex, 1);
+                remarkArray.splice(targetIndex, 0, draggedRemark);
+                localStorage.setItem('remarkArrayString', JSON.stringify(remarkArray));
+                renderRemarks();
+            }
+        }
+
+        function copyToClipboard(i) {
+            const remark = remarkArray[i];
+            navigator.clipboard.writeText(remark)
+                .then(() => {
+                    showTooltip(i, true);
+                })
+                .catch(err => console.error('Failed to copy text: ', err));
+        }
+
+        function showTooltip(i, isCopy = false) {
+            const tooltip = document.getElementById(`tooltip-${i}`);
+            tooltip.textContent = isCopy ? 'Copied!' : 'Copy';
+            tooltip.style.display = 'block';
+            tooltip.style.opacity = '1';
+            setTimeout(() => {
+                tooltip.style.opacity = '0';
+                setTimeout(() => {
+                    tooltip.style.display = 'none';
+                }, 200);
+            }, isCopy ? 2000 : 500);
+        }
+
+        function hideTooltip(i) {
+            const tooltip = document.getElementById(`tooltip-${i}`);
+            tooltip.style.display = 'none';
+        }
+
+        function resetEditing() {
+            editingIndex = null;
+            actionBtn.textContent = 'Add';
+        }
+    </script>
+</body>
+</html>
